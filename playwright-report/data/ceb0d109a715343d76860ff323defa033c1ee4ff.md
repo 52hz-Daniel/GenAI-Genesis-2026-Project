@@ -1,0 +1,49 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "Aptitude AI" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Translate" [ref=e6] [cursor=pointer]:
+          - /url: /translate
+        - link "Interview" [ref=e7] [cursor=pointer]:
+          - /url: /interview
+        - link "Badges" [ref=e8] [cursor=pointer]:
+          - /url: /badges
+        - link "Progress" [ref=e9] [cursor=pointer]:
+          - /url: /progress
+        - button "Sign in" [ref=e10] [cursor=pointer]
+        - button "Switch to dark mode" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+  - main [ref=e14]:
+    - generic [ref=e15]:
+      - heading "Practice interview" [level=1] [ref=e16]
+      - paragraph [ref=e17]: Answer a few behavioral questions. You’ll get gentle feedback and unlock a badge when you finish.
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Question 0 of 3
+          - generic [ref=e21] [cursor=pointer]:
+            - checkbox "Voice on" [ref=e22]
+            - generic [ref=e23]: Voice on
+        - generic [ref=e25]:
+          - paragraph [ref=e27]: Click "Start practice" to begin. The AI will greet you and ask the first question.
+          - generic [ref=e29]:
+            - textbox "Type your answer or record..." [ref=e30]
+            - button "🎤" [ref=e31] [cursor=pointer]
+            - button "Send" [disabled] [ref=e32]
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: "Optional: paste a job description to tailor questions"
+            - textbox "Paste the job description here..." [ref=e36]
+          - button "Start practice" [ref=e37] [cursor=pointer]
+  - alert [ref=e38]
+  - dialog "Analytics consent" [ref=e39]:
+    - generic [ref=e40]:
+      - paragraph [ref=e41]: We use analytics to improve the product (e.g. time to first result, completion rates). No selling of data. You can opt out anytime.
+      - generic [ref=e42]:
+        - button "Accept" [ref=e43] [cursor=pointer]
+        - button "Decline" [ref=e44] [cursor=pointer]
+```
