@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient } from "@/lib/openai";
+import { stripStructuredDelimiters } from "@/lib/parse-feedback-blocks";
 
 type Message = { role: string; content: string };
 
@@ -15,7 +16,11 @@ export async function POST(request: NextRequest) {
     }
     const openai = getOpenAIClient();
     const transcript = messages
-      .map((m) => `${m.role === "user" ? "Candidate" : "Interviewer"}: ${(m.content ?? "").replace(/BADGE_UNLOCKED/g, "").trim()}`)
+      .map((m) => {
+        let text = (m.content ?? "").replace(/BADGE_UNLOCKED/g, "").trim();
+        if (m.role !== "user") text = stripStructuredDelimiters(text);
+        return `${m.role === "user" ? "Candidate" : "Interviewer"}: ${text}`;
+      })
       .join("\n\n");
 
     const completion = await openai.chat.completions.create({
@@ -34,9 +39,7 @@ Key points the interviewer highlighted (strengths, suggestions).
 1-3 bullets: what the candidate did well.
 
 ## Areas to improve
-1-3 bullets: concrete things to work on (e.g. "Add more concrete results", "Use STAR structure more explicitly"). Be specific and actionable.
-
-Output only the markdown, no preamble. Use commas instead of dashes. Keep it concise.`,
+1-3 bullets: concrete, actionable things to work on. Be specific: name the gap and the next step (e.g. "Add a number to the result: include time saved, percentage improved, or team size" not "improve result"; "State your main takeaway in the first sentence" not "structure better"; "Missing: quantified result in STAR, add one metric next time"). Reference STAR explicitly when relevant (e.g. "Missing: clear Result; add a quantified outcome"). Use commas instead of dashes. Keep it concise.`,
         },
         { role: "user", content: `Interview transcript:\n\n${transcript.slice(0, 12000)}` },
       ],

@@ -1,0 +1,100 @@
+/**
+ * Aptitude AI Design Tokens
+ * Single source of truth for brand: supportive, precise, student-first.
+ * Owner: Agent 2. Do not edit from Agent 1, 3, 4.
+ */
+
+/* ---------- Color palette ---------- */
+/* Light: clean, approachable. Dark: focused, low glare. */
+:root {
+  /* Surfaces */
+  --background: #fafbfc;
+  --foreground: #1a2332;
+  --muted: #5c6b7a;
+  --muted-bg: #f0f2f5;
+  --card: #ffffff;
+  --surface-elevated: #ffffff;
+  --border: #e1e5ea;
+
+  /* Brand accent: confident, supportive (refined blue) */
+  --accent: #0967d2;
+  --accent-soft: #e8f0fa;
+  --accent-hover: #0552a3;
+
+  /* Success / positive feedback */
+  --success: #10b981;
+  --success-soft: #d1fae5;
+
+  /* Radii */
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-sm: 0.5rem;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /* Font weight */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Shadows (softer, layered) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 2px 6px -2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.08), 0 4px 8px -2px rgb(0 0 0 / 0.04);
+}
+
+.dark,
+[data-theme="dark"] {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --muted: #8b9cb3;
+  --muted-bg: #161b22;
+  --card: #161b22;
+  --surface-elevated: #21262d;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --accent-soft: #1c3d5c;
+  --accent-hover: #79b8ff;
+  --success: #3fb950;
+  --success-soft: #0d3d1a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0d1117;
+    --foreground: #e6edf3;
+    --muted: #8b9cb3;
+    --muted-bg: #161b22;
+    --card: #161b22;
+    --surface-elevated: #21262d;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent-soft: #1c3d5c;
+    --accent-hover: #79b8ff;
+    --success: #3fb950;
+    --success-soft: #0d3d1a;
+  }
+}

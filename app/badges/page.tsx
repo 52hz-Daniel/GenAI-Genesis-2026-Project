@@ -17,7 +17,7 @@ export default function BadgesPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground mb-2">My badges</h1>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">My badges</h1>
       <p className="text-muted mb-8">
         Your verifiable soft skill achievements. Share them on LinkedIn or copy the text.
       </p>

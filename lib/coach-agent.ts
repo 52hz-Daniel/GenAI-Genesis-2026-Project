@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { getOpenAIClient } from "./openai";
-import { buildInterviewMessages } from "./prompts";
+import { buildInterviewMessages, type InterviewPhase } from "./prompts";
 import { queryUserHistory } from "./query-user-history";
 
 const TOOL_NAME = "query_user_history";
@@ -43,10 +43,11 @@ function formatHistoryResult(items: { evidence_quote: string; socratic_feedback_
 export async function getInterviewReplyWithAgent(
   history: { role: "user" | "assistant"; content: string }[],
   context: string | undefined,
-  userId: string | null
+  userId: string | null,
+  phase?: InterviewPhase
 ): Promise<string> {
   const openai = getOpenAIClient();
-  const baseMessages = buildInterviewMessages(history, context);
+  const baseMessages = buildInterviewMessages(history, context, phase);
   const systemMessage = baseMessages[0];
   const restMessages = baseMessages.slice(1) as Message[];
   const messages: Message[] = [systemMessage, ...restMessages];

@@ -43,7 +43,7 @@ ORDER BY si.created_at DESC;
 1. Start a **new** mock interview with the same user (do not reuse the previous session).
 2. Observe the AI’s opening or early message.
 
-**Expected:** The coach’s behavior adapts: it should reference keeping answers concise, structuring (e.g. conclusion first), or the user’s known area to improve, based on the previous session. This validates that dynamic context (target_weakness / past insight) is injected and the coach uses it.
+**Expected:** The coach’s behavior adapts: it should reference keeping answers concise, structuring (e.g. conclusion first), or the user’s known area to improve, based on the previous session. The dynamic context includes a **session focus** line (e.g. "This session focus: [target_weakness]. Goal: ask questions that test this; give feedback that addresses it.") so the coach does not ask random questions. This validates that dynamic context (session focus, target_weakness / past insight) is injected and the coach uses it.
 
 ---
 
@@ -67,7 +67,7 @@ WHERE user_id = 'YOUR_USER_ID';
 ## How to verify the backend directly
 
 - **After Session 1:** Run the `SELECT` above on `session_insights` and confirm a new row with a weakness tied to Communication or STAR (or Quantifying Impact). No schema change is required.
-- **Dynamic context API:** While signed in as the test user, call `GET /api/context/dynamic`. The response body should include a `context` string that contains the user’s known weakness (e.g. "Communication" or "STAR Method Structuring") after Session 1.
+- **Dynamic context API:** While signed in as the test user, call `GET /api/context/dynamic`. The response body should include a `context` string that (1) starts with or contains a **session focus** line (e.g. "Session focus (use it; do not ask random questions): This session focus: Communication..."), and (2) contains the user’s known weakness (e.g. "Communication" or "STAR Method Structuring") after Session 1. When the user has multiple weaknesses, the context may also include "Next time we can focus on: [second weakness]."
 
 ---
 
@@ -98,7 +98,7 @@ npm run validate:hidden
 
 Requires: `POSTGRES_URL` (or `DATABASE_URL`), schema [schema-memory.sql](./schema-memory.sql) applied. Optional: `OPENAI_API_KEY` for the `queryUserHistory` check (embedding); if unset, only the dynamic-context assertion runs.
 
-The script: (1) Seeds a test user and a `session_insights` row with competency Communication and `insight_type = 'weakness'`. (2) Calls `getDynamicContextForUser` and `formatDynamicContext` and asserts the context string contains the target weakness. (3) If `OPENAI_API_KEY` is set: calls `queryUserHistory(userId, "Communication", 3)` and asserts the returned list includes the seeded evidence.
+The script: (1) Seeds a test user and a `session_insights` row with competency Communication and `insight_type = 'weakness'`. (2) Calls `getDynamicContextForUser` and `formatDynamicContext` and asserts the context string includes the **session focus** line and the target weakness. (3) If `OPENAI_API_KEY` is set: calls `queryUserHistory(userId, "Communication", 3)` and asserts the returned list includes the seeded evidence.
 
 **Manual / future tests:**
 

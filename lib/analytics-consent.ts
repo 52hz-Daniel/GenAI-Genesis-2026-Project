@@ -13,10 +13,13 @@ export function getAnalyticsConsent(): ConsentStatus {
   return "pending";
 }
 
+export const ANALYTICS_CONSENT_CHANGED = "aptitude_analytics_consent_changed";
+
 export function setAnalyticsConsent(status: "accepted" | "declined"): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(CONSENT_KEY, status);
+    window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_CHANGED, { detail: status }));
   } catch {
     // ignore
   }

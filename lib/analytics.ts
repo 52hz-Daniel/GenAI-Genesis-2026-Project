@@ -1,4 +1,6 @@
 export type EventName =
+  | "page_view"
+  | "landing_cta_click"
   | "time_to_first_resume_bullet"
   | "interview_started"
   | "interview_step"

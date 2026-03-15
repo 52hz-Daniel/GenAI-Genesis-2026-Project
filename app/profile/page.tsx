@@ -20,7 +20,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground mb-2">Your profile</h1>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Your profile</h1>
       <p className="text-muted mb-6">
         This info is used to tailor interview questions and feedback. Stored only on this device unless you sign in and we add cloud sync later.
       </p>
@@ -91,7 +91,7 @@ export default function ProfilePage() {
         >
           Save profile
         </button>
-        {saved && <span className="ml-3 text-sm text-green-600">Saved.</span>}
+        {saved && <span className="ml-3 text-sm text-success">Saved.</span>}
       </form>
     </div>
   );

@@ -5,7 +5,7 @@
  * Optional: OPENAI_API_KEY for queryUserHistory check (embedding).
  *
  * 1. Seeds a test user + session_insights weakness (Communication).
- * 2. Asserts formatDynamicContext output contains the target weakness.
+ * 2. Asserts formatDynamicContext output contains the session focus line and target weakness.
  * 3. Asserts queryUserHistory returns the seeded evidence (skipped if no API key).
  */
 
@@ -79,6 +79,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const contextStr = formatDynamicContext(ctx);
+  if (!contextStr.includes("Session focus")) {
+    console.error("FAIL: formatDynamicContext should include a session focus line. context (excerpt):", contextStr.slice(0, 300));
+    process.exit(1);
+  }
+  console.log("OK: Dynamic context includes session focus line.");
   if (!ctx.targetWeakness || !contextStr.toLowerCase().includes(ctx.targetWeakness.toLowerCase())) {
     console.error("FAIL: formatDynamicContext should include target weakness. Got targetWeakness:", ctx.targetWeakness, "context (excerpt):", contextStr.slice(0, 200));
     process.exit(1);

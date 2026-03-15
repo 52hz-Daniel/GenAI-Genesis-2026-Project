@@ -15,7 +15,7 @@ Output a JSON array of objects. Each object must have exactly:
 - insight_type: "weakness" | "strength" | "hidden_spark"
 - score: number 1-5 (1=needs work, 5=excellent)
 - evidence_quote: string (short exact quote from the transcript)
-- socratic_feedback_given: string (what the interviewer said as feedback)
+- socratic_feedback_given: string (constructive, actionable feedback the interviewer gave or should have given, e.g. "State the main takeaway first" or "Add a quantified result"; avoid vague praise like "good job")
 
 Identify 2-6 distinct insights. Include at least one weakness and one strength when present. "hidden_spark" is for a positive behavioral nuance the candidate might not have noticed.
 

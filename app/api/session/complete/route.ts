@@ -3,12 +3,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { createSessionLog } from "@/lib/db-sessions";
+import { stripStructuredDelimiters } from "@/lib/parse-feedback-blocks";
 
 type Message = { role: string; content: string };
 
 function toRawTranscript(messages: Message[]): string {
   return messages
-    .map((m) => `${m.role === "user" ? "Candidate" : "Interviewer"}: ${(m.content ?? "").replace(/BADGE_UNLOCKED/g, "").trim()}`)
+    .map((m) => {
+      let text = (m.content ?? "").replace(/BADGE_UNLOCKED/g, "").trim();
+      if (m.role !== "user") text = stripStructuredDelimiters(text);
+      return `${m.role === "user" ? "Candidate" : "Interviewer"}: ${text}`;
+    })
     .join("\n\n");
 }
 

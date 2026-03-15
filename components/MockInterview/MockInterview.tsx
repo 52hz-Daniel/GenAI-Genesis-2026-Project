@@ -6,8 +6,9 @@ import { useSession } from "next-auth/react";
 import { logEvent } from "@/lib/analytics";
 import { setInterviewBadgeUnlocked } from "@/lib/badges";
 import { INTERVIEW_ANSWER_EXAMPLES } from "@/lib/demo-examples";
-import { getProfile, getProfileSummary } from "@/lib/profile";
+import { getProfile, getProfileSummary, hasMinimalProfile, setProfile, setOnboardingComplete, isOnboardingComplete, type Profile } from "@/lib/profile";
 import { addSessionNote, getMemoryForPrompt } from "@/lib/memory";
+import { parseStructuredFeedback, stripStructuredDelimiters } from "@/lib/parse-feedback-blocks";
 
 const TOTAL_QUESTIONS = 3;
 
@@ -25,6 +26,9 @@ export function MockInterview() {
   const [voiceOn, setVoiceOn] = useState(false);
   const [jdText, setJdText] = useState("");
   const [interviewContext, setInterviewContext] = useState<string>("");
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [questionnaireForm, setQuestionnaireForm] = useState<Partial<Profile>>({});
+  const [sessionFocusLabel, setSessionFocusLabel] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -39,11 +43,29 @@ export function MockInterview() {
   }, [interviewContext]);
 
   useEffect(() => {
+    const profile = getProfile();
+    if (!hasMinimalProfile(profile) && !isOnboardingComplete()) {
+      setShowQuestionnaire(true);
+      setQuestionnaireForm({
+        targetRole: profile.targetRole ?? "",
+        year: profile.year ?? "",
+        major: profile.major ?? "",
+        improveArea: profile.improveArea ?? "",
+        firstGen: profile.firstGen,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (!voiceOn || messages.length === 0) return;
     const last = messages[messages.length - 1];
     if (last.role !== "assistant" || lastPlayedAssistantIndexRef.current === messages.length - 1) return;
     lastPlayedAssistantIndexRef.current = messages.length - 1;
-    const toSpeak = last.content.replace(/BADGE_UNLOCKED/g, "").trim();
+    const raw = last.content.replace(/BADGE_UNLOCKED/g, "").trim();
+    const structured = parseStructuredFeedback(last.content);
+    const toSpeak = structured
+      ? `${structured.feedback} ${structured.followUp}`.trim()
+      : raw;
     if (!toSpeak) return;
     let cancelled = false;
     (async () => {
@@ -99,6 +121,9 @@ export function MockInterview() {
           const dcRes = await fetch("/api/context/dynamic");
           const dcData = await dcRes.json();
           if (dcData?.context) dynamicContext = dcData.context;
+          if (typeof dcData?.sessionFocusLabel === "string") {
+            setSessionFocusLabel(dcData.sessionFocusLabel);
+          }
         } catch {
           // ignore
         }
@@ -107,15 +132,43 @@ export function MockInterview() {
       const jdContext = interviewContextRef.current?.trim();
       const memoryContext = getMemoryForPrompt();
       const context = [dynamicContext, memoryContext, profileSummary, jdContext].filter(Boolean).join("\n\n") || undefined;
+
+      const phase =
+        history.length === 1
+          ? "warmup"
+          : history.length === 3 && history[2].role === "user"
+            ? "post_warmup"
+            : undefined;
+
       const res = await fetch("/api/openai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "interview", history, context }),
+        body: JSON.stringify({ type: "interview", history, context, phase }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
       const reply = data.reply ?? "";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+
+      if (phase === "post_warmup" && session?.user) {
+        try {
+          const sessionFocusMatch = dynamicContext.match(/This session focus:\s*([^.]+)/);
+          const sessionFocus = sessionFocusMatch
+            ? sessionFocusMatch[1].trim().slice(0, 100)
+            : undefined;
+          await fetch("/api/context/gather", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: history.slice(0, 3),
+              sessionFocus,
+            }),
+          });
+        } catch {
+          // fire-and-forget
+        }
+      }
+
       if (reply.includes("BADGE_UNLOCKED")) {
         setInterviewBadgeUnlocked();
         setCompleted(true);
@@ -252,27 +305,56 @@ export function MockInterview() {
       </div>
       <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-card flex flex-col">
         <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          {sessionFocusLabel && messages.length > 0 && (
+            <p className="text-xs text-muted border-b border-border pb-2 mb-1">
+              This session: focusing on <span className="font-medium text-foreground">{sessionFocusLabel}</span>
+            </p>
+          )}
           {messages.length === 0 && !loading && (
             <p className="text-muted text-sm">
               Click &quot;Start practice&quot; to begin. The AI will greet you and ask the first question.
             </p>
           )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                  m.role === "user"
-                    ? "bg-accent text-white rounded-br-md"
-                    : "bg-muted-bg text-foreground rounded-bl-md"
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{m.content.replace(/BADGE_UNLOCKED/g, "").trim()}</p>
+          {messages.map((m, i) => {
+            if (m.role === "user") {
+              return (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 bg-accent text-white rounded-br-md">
+                    <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                  </div>
+                </div>
+              );
+            }
+            const structured = parseStructuredFeedback(m.content);
+            const displayText = stripStructuredDelimiters(m.content).replace(/BADGE_UNLOCKED/g, "").trim();
+            if (structured) {
+              return (
+                <div key={i} className="flex justify-start">
+                  <div className="max-w-[85%] sm:max-w-[75%] w-full space-y-2">
+                    <div className="rounded-2xl rounded-bl-md bg-muted-bg text-foreground px-4 py-2.5 border border-border">
+                      <p className="text-xs font-medium text-muted mb-1">Feedback</p>
+                      <p className="text-sm whitespace-pre-wrap">{structured.feedback}</p>
+                    </div>
+                    <div className="rounded-2xl rounded-bl-md bg-muted-bg text-foreground px-4 py-2.5 border border-border">
+                      <p className="text-xs font-medium text-muted mb-1">Follow-up questions</p>
+                      <p className="text-sm whitespace-pre-wrap">{structured.followUp}</p>
+                    </div>
+                    <div className="rounded-2xl rounded-bl-md bg-muted-bg text-foreground px-4 py-2.5 border border-border">
+                      <p className="text-xs font-medium text-muted mb-1">Optimized answer</p>
+                      <p className="text-sm whitespace-pre-wrap">{structured.optimized}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={i} className="flex justify-start">
+                <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md bg-muted-bg text-foreground px-4 py-2.5">
+                  <p className="text-sm whitespace-pre-wrap">{displayText}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {loading && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md bg-muted-bg px-4 py-2.5">
@@ -360,7 +442,98 @@ export function MockInterview() {
         )}
       </div>
 
-      {messages.length === 0 && !loading && (
+      {messages.length === 0 && !loading && showQuestionnaire && (
+        <div className="mt-4 space-y-3 p-4 rounded-xl border border-border bg-card">
+          <p className="text-sm font-medium text-foreground mb-3">
+            Quick profile (so we can tailor your practice)
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Target role or industry</label>
+              <input
+                type="text"
+                value={questionnaireForm.targetRole ?? ""}
+                onChange={(e) => setQuestionnaireForm((p) => ({ ...p, targetRole: e.target.value }))}
+                placeholder="e.g. Consulting, Product Manager"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-muted mb-1">Year</label>
+                <input
+                  type="text"
+                  value={questionnaireForm.year ?? ""}
+                  onChange={(e) => setQuestionnaireForm((p) => ({ ...p, year: e.target.value }))}
+                  placeholder="e.g. Junior, 2026"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Major</label>
+                <input
+                  type="text"
+                  value={questionnaireForm.major ?? ""}
+                  onChange={(e) => setQuestionnaireForm((p) => ({ ...p, major: e.target.value }))}
+                  placeholder="Optional"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">What do you want to improve in interviews?</label>
+              <input
+                type="text"
+                value={questionnaireForm.improveArea ?? ""}
+                onChange={(e) => setQuestionnaireForm((p) => ({ ...p, improveArea: e.target.value }))}
+                placeholder="e.g. Quantifying results, STAR structure"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={questionnaireForm.firstGen ?? false}
+                onChange={(e) => setQuestionnaireForm((p) => ({ ...p, firstGen: e.target.checked }))}
+                className="rounded border-border"
+              />
+              <span className="text-sm text-muted">First-gen student</span>
+            </label>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setProfile({
+                  ...getProfile(),
+                  ...questionnaireForm,
+                  targetRole: questionnaireForm.targetRole?.trim() || undefined,
+                  year: questionnaireForm.year?.trim() || undefined,
+                  major: questionnaireForm.major?.trim() || undefined,
+                  improveArea: questionnaireForm.improveArea?.trim() || undefined,
+                  firstGen: questionnaireForm.firstGen,
+                });
+                setOnboardingComplete();
+                setShowQuestionnaire(false);
+              }}
+              className="rounded-xl bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-accent/90"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOnboardingComplete();
+                setShowQuestionnaire(false);
+              }}
+              className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted-bg"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+      {messages.length === 0 && !loading && !showQuestionnaire && (
         <div className="mt-4 space-y-3">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
+import { AnalyticsGate } from "@/components/analytics/AnalyticsGate";
 import { Header } from "@/components/Header";
 import { SessionProvider } from "@/components/auth/SessionProvider";
 
@@ -16,11 +18,27 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
   weight: "100 900",
 });
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Aptitude AI | Your career companion",
   description:
-    "Translate your experiences into resume bullets and practice interviews with supportive AI. Built for students.",
+    "Resume bullets and interview practice that remember you. Built for students. First win in under 60 seconds.",
+  openGraph: {
+    title: "Aptitude AI | Your career companion",
+    description:
+      "Resume bullets and interview practice that remember you. Built for students. First win in under 60 seconds.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Aptitude AI | Your career companion",
+    description:
+      "Resume bullets and interview practice that remember you. Built for students. First win in under 60 seconds.",
+  },
 };
 
 export default function RootLayout({
@@ -30,12 +48,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} antialiased min-h-screen flex flex-col`}>
         <ThemeProvider>
           <SessionProvider>
-            <Header />
-            <main className="flex-1">{children}</main>
-            <ConsentBanner />
+            <AnalyticsGate>
+              <Header />
+              <main className="flex-1">{children}</main>
+              <ConsentBanner />
+            </AnalyticsGate>
           </SessionProvider>
         </ThemeProvider>
       </body>

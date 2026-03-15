@@ -7,7 +7,12 @@ import { getOrCreateUserByEmail } from "@/lib/db-users";
 
 type Body =
   | { type: "resume"; input: string }
-  | { type: "interview"; history: { role: "user" | "assistant"; content: string }[]; context?: string };
+  | {
+      type: "interview";
+      history: { role: "user" | "assistant"; content: string }[];
+      context?: string;
+      phase?: "warmup" | "post_warmup" | "main";
+    };
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,13 +26,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ bullets });
     }
     if (body.type === "interview") {
-      const { history, context } = body;
+      const { history, context, phase } = body;
       if (!Array.isArray(history)) {
         return NextResponse.json({ error: "Missing or invalid history" }, { status: 400 });
       }
       const session = await getServerSession(authOptions);
       const userId = session?.user?.email ? await getOrCreateUserByEmail(session.user.email) : null;
-      const reply = await getInterviewReplyWithAgent(history, context, userId);
+      const reply = await getInterviewReplyWithAgent(history, context, userId, phase);
       return NextResponse.json({ reply });
     }
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
