@@ -68,7 +68,10 @@ export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to create session");
+        const msg = data?.details
+          ? `${data.error ?? "Failed to create session"}: ${data.details}`
+          : (data?.error || "Failed to create session");
+        throw new Error(msg);
       }
 
       const clientSecret = data.clientSecret as string;
@@ -229,10 +232,16 @@ export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
   }
 
   if (status === "error") {
+    const isRealtimeFail = errorMessage?.includes("Realtime") || errorMessage?.includes("502");
     return (
       <div className="rounded-xl border border-border bg-card p-6">
         <p className="text-destructive font-medium mb-2">Error</p>
-        <p className="text-muted text-sm mb-4">{errorMessage}</p>
+        <p className="text-muted text-sm mb-2 break-words">{errorMessage}</p>
+        {isRealtimeFail && (
+          <p className="text-muted text-xs mb-4">
+            On Vercel: set <code className="bg-muted px-1 rounded">OPENAI_API_KEY</code> in Production env. Realtime requires API access.
+          </p>
+        )}
         <button
           type="button"
           onClick={() => { setStatus("idle"); setErrorMessage(null); }}

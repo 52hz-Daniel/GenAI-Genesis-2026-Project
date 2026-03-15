@@ -1,6 +1,18 @@
-# Auth setup: Microsoft (Azure AD) and Apple
+# Auth setup: Google, Microsoft (Azure AD), Apple
 
 After the app is implemented, **you** need to create the app registrations and set environment variables. Google is required; Microsoft and Apple are optional.
+
+---
+
+## Google: Fix "redirect_uri_mismatch" in production
+
+1. **Get your production URL** from Vercel (e.g. `https://genesis-2026-project.vercel.app`).
+2. **Vercel env:** Project → Settings → Environment Variables. Set **Production**:  
+   `NEXTAUTH_URL` = `https://<your-vercel-domain>` (no trailing slash). Redeploy if you change it.
+3. **Google Cloud Console:** [APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials) → open your **OAuth 2.0 Client ID** (Web application) → **Authorized redirect URIs** → **Add URI**:  
+   `https://<your-vercel-domain>/api/auth/callback/google`  
+   (e.g. `https://genesis-2026-project.vercel.app/api/auth/callback/google`) → **Save**.
+4. Try sign-in again (no code change needed).
 
 ---
 
