@@ -1,35 +1,142 @@
 # Aptitude AI MVP
 
-A mobile-first web app that helps university students translate academic experiences into resume bullets and practice behavioral interviews with supportive AI.
+**Aptitude AI** is an accessible, AI-powered career companion for university students. It addresses a critical gap: students graduate without the soft skills employers demand, while campus career centers are overwhelmed. The app meets students where they are with a friendly, judgment-free product that **remembers you**—so every session and every feature gets better over time.
 
-## Where to add your API key
+- **Practice behavioral interviews** (text or optional voice) with an empathetic AI coach that can reference your past performance and re-test on weaknesses.
+- **Translate** academic experiences into ATS-friendly, NACE-aligned resume bullets in seconds.
+- **Live voice interview** powered by OpenAI Realtime for real-time conversation with the same coaching brain.
+- **Opportunities feed** with deadlines and evidence-based **Confidence Dossiers**: why you’re ready (from *your* practice), where to watch out, and a Socratic prompt so *you* decide—no infinite link dump.
+- **Progress & memory**: when using Postgres, completed interviews feed structured insights (competency, evidence, feedback) into a vector store so the coach and dossiers use your real history.
 
-1. Open the project folder: `aptitude-ai-mvp`
-2. Create a file named `.env.local` in that folder (same level as `package.json`)
-3. Add one line with your OpenAI API key:
+The app works without a database too: anonymous users get progress and badges via `localStorage`; with **Postgres + pgvector** you unlock memory, opportunities, and dossiers.
+
+---
+
+## Features
+
+| Feature | Description |
+|--------|--------------|
+| **Experience Translator** | Paste what you did in class and get 3 ATS-friendly, NACE-aligned resume bullet options. |
+| **Mock Interview** | Chat with an AI that asks behavioral questions and gives structured feedback (three-card: feedback, follow-up, optimized answer). Unlock a shareable badge when you finish. Optional voice input (Whisper). |
+| **Live Voice Interview** | Real-time voice conversation via OpenAI Realtime (WebRTC); same coaching context and rapport. Fallback: Whisper + chat + TTS. |
+| **Digital Badges** | View, copy, and share your badge (e.g. to LinkedIn) after completing a mock interview. |
+| **Progress** | See your session history and insights; when DB is present, the coach uses vector search over past competencies with time decay. |
+| **Opportunities** | Feed of opportunities with deadlines; apply / save / reject actions. “Anti-doomscroll” design. |
+| **Confidence Dossier** | Per opportunity: “Why you’re ready” (from your evidence), “Watch out for” blind spots, and a Socratic prompt so you decide. Requires Postgres + memory. |
+
+---
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. API key (required)
+
+1. Create a file named `.env.local` in the project root (same level as `package.json`).
+2. Add your OpenAI API key:
    ```
    OPENAI_API_KEY=sk-your-actual-key-here
    ```
-4. Save the file. Restart the dev server (`npm run dev`) if it is already running.
-5. Do not commit `.env.local` to git (it is already in `.gitignore`)
+3. Save the file. Restart the dev server if it is already running.
+4. Do **not** commit `.env.local` to git (it is in `.gitignore`).
 
-You can copy `.env.example` and then replace the placeholder with your real key.
+You can copy `.env.example` and replace the placeholder with your real key.
 
-## Example input for judges (Translate an experience)
+### 3. Run the app
 
-For the **What did you do in class this week?** field, judges can paste this example to see the full flow:
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### 4. Optional: Postgres (memory, opportunities, dossier)
+
+To enable long-term memory, opportunities feed, and Confidence Dossiers:
+
+1. Create a Postgres database (e.g. [Neon](https://neon.tech)) with **pgvector** enabled.
+2. Run the schema in your database:
+   - Memory & core: `docs/schema-memory.sql`
+   - Analytics (optional): `docs/schema-analytics.sql`
+3. Add to `.env.local`:
+   ```
+   POSTGRES_URL=postgresql://user:password@host/database?sslmode=require
+   ```
+
+When `POSTGRES_URL` is set, signed-in users get session storage, insight extraction, vector-backed coach history, opportunities, and dossiers. Without it, the app still works: progress and badges use `localStorage`.
+
+### 5. Optional: Auth (Google, etc.)
+
+For sign-in and per-user memory, configure NextAuth. See [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md) for environment variables and provider setup.
+
+---
+
+## Scripts
+
+| Command | Description |
+|--------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Run production server |
+| `npm run lint` | Run ESLint |
+| `npm run test:e2e` | Playwright E2E tests (start dev server in another terminal first) |
+| `npm run validate:hidden` | Validate hidden system (e.g. coach tool, extraction) |
+
+---
+
+## Project structure
+
+| Path | Purpose |
+|------|--------|
+| `app/` | Next.js 14 App Router: pages (home, translate, interview, live-interview, progress, badges, opportunities, profile, auth). API routes under `app/api/`. |
+| `lib/` | Core logic: `coach-agent.ts`, `openai.ts`, `prompts.ts`, `dynamic-prompt.ts`, `extract-insights.ts`, `query-user-history.ts`, `db.ts` and `db-*.ts`, `live-*.ts`, `auth.ts`, `analytics.ts`, etc. |
+| `lib/aggregation/` | Opportunities matching and Confidence Dossier generation. |
+| `components/` | React UI: MockInterview, LiveInterview, ExperienceTranslator, BadgeCard, design system, auth, analytics consent. |
+| `docs/` | Documentation and schemas. |
+
+### Key documentation
+
+- [docs/schema-memory.sql](docs/schema-memory.sql) — Postgres + pgvector schema (users, session_logs, session_insights, opportunities, etc.).
+- [docs/schema-analytics.sql](docs/schema-analytics.sql) — Analytics events table.
+- [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md) — NextAuth and environment setup.
+- [docs/INVESTOR_JUDGE_REPORT.md](docs/INVESTOR_JUDGE_REPORT.md) — Full product and technical overview for judges and investors.
+- [docs/DEMO_VIDEO_SCRIPT_3MIN.md](docs/DEMO_VIDEO_SCRIPT_3MIN.md) — 3-minute demo script and screen-recording markers.
+- [docs/PROJECT_STORY_AND_BUILT_WITH.md](docs/PROJECT_STORY_AND_BUILT_WITH.md) — “About the project” and “Built with” text for submission forms.
+
+---
+
+## Tech stack
+
+- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS.
+- **Auth:** NextAuth (Google; optional Azure AD, Apple).
+- **Database:** Optional Postgres (Neon) with **pgvector** for semantic memory and vector search.
+- **AI:** OpenAI — GPT-4o-mini (coach, resume bullets, insight extraction, dossier, JD summarization), **gpt-realtime** for live voice, Whisper + TTS for fallback, **text-embedding-3-small** for insights and retrieval.
+- **Analytics:** PostHog (consent-gated); server-side batch events to `analytics_events` when DB is present.
+- **Hosting:** Vercel (Node.js serverless). E2E: Playwright.
+
+---
+
+## Example inputs for judges (Translate)
+
+For the **What did you do in class this week?** field, judges can paste this example:
 
 ```
 In my marketing class we had to do a group project. Our team of four had to research a brand and present a campaign idea. I was responsible for the competitor analysis and I also helped put together the slides. We presented in front of the class and got feedback from the professor. It took about three weeks and we had to meet outside of class a few times to get it done.
 ```
 
-This will produce three professional resume bullet options that the judges can copy.
+This produces three professional resume bullet options.
 
-**In the app:** On the Translate page, judges can click **Quick demo for judges** and choose an example (e.g. "Marketing group project") to fill the box in one click. Same style is available on the Mock Interview page: after each question, a **Use example answer for this question** button appears so they can fill and send without typing.
+**In the app:** On the Translate page, click **Quick demo for judges** and choose an example (e.g. “Marketing group project”) to fill the box in one click.
+
+---
 
 ## Example inputs for judges (Mock interview)
 
-After clicking **Start practice**, the AI will ask three behavioral questions. Judges can use these example answers (one per question) to quickly complete the flow:
+After clicking **Start practice**, the AI asks three behavioral questions. Use these example answers (one per question) to complete the flow quickly:
 
 **Question 1 (e.g. teamwork or difficult teammate):**
 ```
@@ -46,31 +153,10 @@ We had a big assignment due in 48 hours and our group was behind. I suggested we
 I had to learn basic Excel for a class project and I had never used it before. I watched a few short tutorials and practiced with sample data. Within a couple of days I could do the formulas and charts we needed. I like learning by doing and asking for help when I get stuck.
 ```
 
-In the app, the **Use example answer for this question** button fills the current answer for them; they can edit it or click Send as is.
+In the app, the **Use example answer for this question** button fills the current answer; you can edit or send as is.
 
-## Features
+---
 
-- **Experience Translator**: Paste what you did in class and get 3 ATS friendly resume bullet options (NACE aligned).
-- **Mock Interview**: Chat with an empathetic AI that asks behavioral questions and gives gentle feedback; unlock a badge when you finish.
-- **Digital Badges**: View, copy, and share your badge (e.g. to LinkedIn).
+## Demo mode for judges
 
-## Setup
-
-1. Install dependencies: `npm install`
-2. Add your OpenAI API key in `.env.local` (see "Where to add your API key" above).
-3. Run dev server: `npm run dev`
-4. Open [http://localhost:3000](http://localhost:3000).
-
-## Scripts
-
-- `npm run dev`: Start development server
-- `npm run build`: Production build
-- `npm run start`: Start production server
-- `npm run lint`: Run ESLint
-- `npm run test:e2e`: Run Playwright E2E tests. Start the dev server first (`npm run dev`) in another terminal if tests report connection refused.
-
-## Tech
-
-- Next.js 14 (App Router), React, TypeScript, Tailwind CSS.
-- OpenAI API (gpt-4o-mini) for resume bullets and interview chat.
-- Optional **Postgres + pgvector** for long-term memory: run `docs/schema-memory.sql`, set `POSTGRES_URL`. When logged in, completed interviews are stored and a background job extracts insights (strengths, weaknesses, hidden sparks) for personalized coaching and progress. Anonymous users keep using `localStorage` for session notes and badge state.
+The app supports a **demo judge** mode (cookie-based “effective user”) so evaluators can try flows without signing in. Use the demo controls in the UI when available.
