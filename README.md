@@ -67,10 +67,10 @@ In the app, the **Use example answer for this question** button fills the curren
 - `npm run build`: Production build
 - `npm run start`: Start production server
 - `npm run lint`: Run ESLint
-- `npm run test:e2e`: Run Playwright E2E tests (start dev server first, or set `CI=1` to skip webServer)
+- `npm run test:e2e`: Run Playwright E2E tests. Start the dev server first (`npm run dev`) in another terminal if tests report connection refused.
 
 ## Tech
 
 - Next.js 14 (App Router), React, TypeScript, Tailwind CSS.
 - OpenAI API (gpt-4o-mini) for resume bullets and interview chat.
-- No database; badge unlock state is stored in `localStorage`.
+- Optional **Postgres + pgvector** for long-term memory: run `docs/schema-memory.sql`, set `POSTGRES_URL`. When logged in, completed interviews are stored and a background job extracts insights (strengths, weaknesses, hidden sparks) for personalized coaching and progress. Anonymous users keep using `localStorage` for session notes and badge state.

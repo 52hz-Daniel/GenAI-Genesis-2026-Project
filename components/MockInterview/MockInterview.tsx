@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { logEvent } from "@/lib/analytics";
 import { setInterviewBadgeUnlocked } from "@/lib/badges";
 import { INTERVIEW_ANSWER_EXAMPLES } from "@/lib/demo-examples";
@@ -13,6 +14,7 @@ const TOTAL_QUESTIONS = 3;
 type Message = { role: "user" | "assistant"; content: string };
 
 export function MockInterview() {
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,10 +93,20 @@ export function MockInterview() {
     const step = history.filter((m) => m.role === "user").length;
     logEvent("interview_step", { step });
     try {
+      let dynamicContext = "";
+      if (session?.user) {
+        try {
+          const dcRes = await fetch("/api/context/dynamic");
+          const dcData = await dcRes.json();
+          if (dcData?.context) dynamicContext = dcData.context;
+        } catch {
+          // ignore
+        }
+      }
       const profileSummary = getProfileSummary(getProfile());
       const jdContext = interviewContextRef.current?.trim();
       const memoryContext = getMemoryForPrompt();
-      const context = [memoryContext, profileSummary, jdContext].filter(Boolean).join("\n\n") || undefined;
+      const context = [dynamicContext, memoryContext, profileSummary, jdContext].filter(Boolean).join("\n\n") || undefined;
       const res = await fetch("/api/openai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,6 +121,17 @@ export function MockInterview() {
         setCompleted(true);
         logEvent("interview_completed");
         const fullHistory = [...history, { role: "assistant" as const, content: reply }];
+        if (session?.user) {
+          try {
+            await fetch("/api/session/complete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ messages: fullHistory }),
+            });
+          } catch {
+            // ignore
+          }
+        }
         try {
           const res = await fetch("/api/session-notes", {
             method: "POST",

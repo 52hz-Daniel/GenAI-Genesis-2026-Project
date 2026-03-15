@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { getSessionNotes, type SessionNote } from "@/lib/memory";
+import type { ProgressSession, ProgressInsight } from "@/app/api/progress/route";
 
 function NoteCard({ note }: { note: SessionNote }) {
   const [expanded, setExpanded] = useState(false);
@@ -34,11 +36,27 @@ function NoteCard({ note }: { note: SessionNote }) {
 }
 
 export default function ProgressPage() {
+  const { data: session } = useSession();
   const [notes, setNotes] = useState<SessionNote[]>([]);
+  const [sessions, setSessions] = useState<ProgressSession[]>([]);
+  const [insights, setInsights] = useState<ProgressInsight[]>([]);
 
   useEffect(() => {
     setNotes(getSessionNotes());
   }, []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/progress")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.sessions)) setSessions(data.sessions);
+        if (Array.isArray(data.insights)) setInsights(data.insights);
+      })
+      .catch(() => {});
+  }, [session?.user]);
+
+  const hasDbProgress = session?.user && (sessions.length > 0 || insights.length > 0);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
@@ -46,12 +64,45 @@ export default function ProgressPage() {
       <p className="text-muted mb-6">
         Auto-generated notes after each mock interview. Use them to review feedback and areas to improve.
       </p>
-      {notes.length === 0 ? (
+      {hasDbProgress && (
+        <>
+          {sessions.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold text-foreground mb-3">Sessions</h2>
+              <ul className="space-y-2">
+                {sessions.map((s) => (
+                  <li key={s.id} className="text-sm text-muted">
+                    {new Date(s.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })} — {s.session_type}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {insights.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold text-foreground mb-3">Insights</h2>
+              <div className="space-y-3">
+                {insights.slice(0, 20).map((i, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-card p-3">
+                    <span className="text-xs font-medium text-accent">{i.competency_name}</span>
+                    <span className="text-xs text-muted ml-2">({i.insight_type})</span>
+                    {i.score != null && <span className="text-xs text-muted ml-2">Score: {i.score}</span>}
+                    {i.evidence_quote && <p className="text-sm text-foreground mt-1">{i.evidence_quote}</p>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+      {!hasDbProgress && notes.length === 0 && (
         <p className="text-muted">
           No session notes yet. Complete a mock interview to see your first note.
         </p>
-      ) : (
+      )}
+      {!hasDbProgress && notes.length > 0 && (
         <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Session notes (this device)</h2>
           {notes.map((note) => (
             <NoteCard key={note.id} note={note} />
           ))}

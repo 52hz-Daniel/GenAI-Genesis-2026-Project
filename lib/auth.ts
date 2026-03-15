@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { getOrCreateUserByEmail } from "./db-users";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -11,5 +12,11 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/auth/signin",
+  },
+  callbacks: {
+    signIn: async ({ user }) => {
+      if (user?.email) await getOrCreateUserByEmail(user.email);
+      return true;
+    },
   },
 };
