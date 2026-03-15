@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import type { OpportunityFeedItem, OpportunityContentType } from "@/lib/aggregation/types";
 import type { ConfidenceDossier } from "@/lib/aggregation/types";
+import { isDemoJudgeMode } from "@/lib/demo-judge-client";
 
 function formatDeadline(opensAt: string | null, closesAt: string | null): string | null {
   if (closesAt) {
@@ -29,6 +30,7 @@ function formatDeadline(opensAt: string | null, closesAt: string | null): string
 
 export default function OpportunitiesPage() {
   const { data: session, status } = useSession();
+  const [demoJudgeActive, setDemoJudgeActive] = useState(false);
   const [contentType, setContentType] = useState<OpportunityContentType | "all">("all");
   const [opportunities, setOpportunities] = useState<OpportunityFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,19 +39,34 @@ export default function OpportunitiesPage() {
   const [dossierLoading, setDossierLoading] = useState(false);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user) {
+    setDemoJudgeActive(isDemoJudgeMode());
+  }, []);
+
+  const canFetchFeed = (status === "authenticated" && session?.user) || demoJudgeActive;
+
+  useEffect(() => {
+    if (!canFetchFeed) {
       setLoading(false);
       return;
     }
     const url = contentType === "all" ? "/api/aggregation/feed" : `/api/aggregation/feed?content_type=${contentType}`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.opportunities)) setOpportunities(data.opportunities);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [status, session?.user, contentType]);
+    const load = () =>
+      fetch(url, { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.opportunities)) setOpportunities(data.opportunities);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+
+    if (demoJudgeActive) {
+      fetch("/api/demo/seed-feed", { method: "POST", credentials: "include" })
+        .then(() => load())
+        .catch(() => load());
+    } else {
+      load();
+    }
+  }, [canFetchFeed, status, session?.user, contentType, demoJudgeActive]);
 
   const openDossier = (id: string) => {
     setSelectedId(id);
@@ -86,16 +103,16 @@ export default function OpportunitiesPage() {
   if (status === "loading" || loading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Opportunities</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Community</h1>
         <div className="rounded-xl border border-border bg-card h-48 animate-pulse" />
       </div>
     );
   }
 
-  if (!session?.user) {
+  if (!session?.user && !demoJudgeActive) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Opportunities</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Community</h1>
         <p className="text-muted mb-6">
           Sign in to see opportunities matched to your profile and progress.
         </p>
@@ -114,7 +131,7 @@ export default function OpportunitiesPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Opportunities</h1>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-foreground mb-2">Community</h1>
       <p className="text-muted mb-6">
         Curated for you based on your profile and practice. See why you’re ready and take action.
       </p>

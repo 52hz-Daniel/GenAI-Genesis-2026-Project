@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { getSql } from "@/lib/db";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 const VALID_ACTIONS = ["apply", "save", "reject"] as const;
 
@@ -13,11 +12,11 @@ const VALID_ACTIONS = ["apply", "save", "reject"] as const;
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(req);
+    if (!effective?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = await getOrCreateUserByEmail(session.user.email);
+    const userId = await getOrCreateUserByEmail(effective.email);
     if (!userId) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

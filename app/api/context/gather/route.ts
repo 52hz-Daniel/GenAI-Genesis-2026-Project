@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { insertGatheredContext } from "@/lib/db-gathered-context";
 import { extractGatheredContext } from "@/lib/extract-gathered-context";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 type Message = { role: string; content: string };
 
@@ -15,8 +14,8 @@ function toTranscript(messages: Message[]): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(request);
+    if (!effective?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = await getOrCreateUserByEmail(session.user.email);
+    const userId = await getOrCreateUserByEmail(effective.email);
     if (!userId) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

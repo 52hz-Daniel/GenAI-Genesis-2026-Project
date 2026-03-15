@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { getRankedOpportunitiesForUser } from "@/lib/aggregation";
 import { getSql } from "@/lib/db";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 /**
  * GET /api/aggregation/feed
@@ -13,11 +12,11 @@ import { getSql } from "@/lib/db";
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(req);
+    if (!effective?.email) {
       return NextResponse.json({ opportunities: [] }, { status: 401 });
     }
-    const userId = await getOrCreateUserByEmail(session.user.email);
+    const userId = await getOrCreateUserByEmail(effective.email);
     if (!userId) {
       return NextResponse.json({ opportunities: [] });
     }
@@ -45,7 +44,7 @@ export async function GET(req: NextRequest) {
       contentTypeParam === "trend" || contentTypeParam === "opportunity"
         ? { contentType: contentTypeParam as "trend" | "opportunity" }
         : undefined;
-    const opportunities = await getRankedOpportunitiesForUser(userId, session.user.email, options);
+    const opportunities = await getRankedOpportunitiesForUser(userId, effective.email, options);
     return NextResponse.json({ opportunities });
   } catch (e) {
     console.error("aggregation/feed", e);

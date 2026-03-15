@@ -9,13 +9,15 @@ export type Profile = {
   careerGoals?: string;
   /** What the user wants to improve in interviews (from pre-interview questionnaire) */
   improveArea?: string;
+  /** Field or area of interest (e.g. business analysis, consulting). Used so the coach tailors examples. */
+  fieldOfInterest?: string;
 };
 
 const ONBOARDING_COMPLETE_KEY = "aptitude_onboarding_complete";
 
-/** True if user has filled at least target role or improve area (used to show or skip pre-interview questionnaire). */
+/** True if user has filled at least target role, improve area, or field of interest (used to show or skip pre-interview questionnaire). */
 export function hasMinimalProfile(profile: Profile): boolean {
-  return !!(profile.targetRole?.trim() || profile.improveArea?.trim());
+  return !!(profile.targetRole?.trim() || profile.improveArea?.trim() || profile.fieldOfInterest?.trim());
 }
 
 /** Mark that the user has completed or skipped the pre-interview questionnaire. */
@@ -68,6 +70,7 @@ export function getProfileSummary(profile: Profile): string {
   if (profile.firstGen !== undefined) parts.push(`First-gen: ${profile.firstGen ? "yes" : "no"}`);
   if (profile.careerGoals) parts.push(`Career goals: ${profile.careerGoals}`);
   if (profile.improveArea) parts.push(`Wants to improve in interviews: ${profile.improveArea}`);
+  if (profile.fieldOfInterest) parts.push(`Field of interest: ${profile.fieldOfInterest} (use this for examples and role context; do not assume consulting if they said e.g. business analysis)`);
   if (parts.length === 0) return "";
   return "Candidate profile: " + parts.join(". ");
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { getSessionNotes, type SessionNote } from "@/lib/memory";
+import { isDemoJudgeMode } from "@/lib/demo-judge-client";
 import type { ProgressSession, ProgressInsight } from "@/app/api/progress/route";
 
 function NoteCard({ note }: { note: SessionNote }) {
@@ -37,6 +38,7 @@ function NoteCard({ note }: { note: SessionNote }) {
 
 export default function ProgressPage() {
   const { data: session } = useSession();
+  const [demoJudgeActive, setDemoJudgeActive] = useState(false);
   const [notes, setNotes] = useState<SessionNote[]>([]);
   const [sessions, setSessions] = useState<ProgressSession[]>([]);
   const [insights, setInsights] = useState<ProgressInsight[]>([]);
@@ -46,7 +48,13 @@ export default function ProgressPage() {
   }, []);
 
   useEffect(() => {
-    if (!session?.user) return;
+    setDemoJudgeActive(isDemoJudgeMode());
+  }, []);
+
+  const canFetchProgress = session?.user || demoJudgeActive;
+
+  useEffect(() => {
+    if (!canFetchProgress) return;
     fetch("/api/progress")
       .then((res) => res.json())
       .then((data) => {
@@ -54,9 +62,9 @@ export default function ProgressPage() {
         if (Array.isArray(data.insights)) setInsights(data.insights);
       })
       .catch(() => {});
-  }, [session?.user]);
+  }, [canFetchProgress, session?.user, demoJudgeActive]);
 
-  const hasDbProgress = session?.user && (sessions.length > 0 || insights.length > 0);
+  const hasDbProgress = canFetchProgress && (sessions.length > 0 || insights.length > 0);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getResumeBullets } from "@/lib/openai";
 import { getInterviewReplyWithAgent } from "@/lib/coach-agent";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 type Body =
   | { type: "resume"; input: string }
@@ -30,8 +29,8 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(history)) {
         return NextResponse.json({ error: "Missing or invalid history" }, { status: 400 });
       }
-      const session = await getServerSession(authOptions);
-      const userId = session?.user?.email ? await getOrCreateUserByEmail(session.user.email) : null;
+      const effective = await getEffectiveUser(request);
+      const userId = effective?.email ? await getOrCreateUserByEmail(effective.email) : null;
       const reply = await getInterviewReplyWithAgent(history, context, userId, phase);
       return NextResponse.json({ reply });
     }

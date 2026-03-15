@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { getSql } from "@/lib/db";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 export type ProgressSession = {
   id: string;
@@ -17,17 +16,17 @@ export type ProgressInsight = {
   created_at: string;
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(request);
+    if (!effective?.email) {
       return NextResponse.json({ sessions: [], insights: [] });
     }
     const sql = getSql();
     if (!sql) {
       return NextResponse.json({ sessions: [], insights: [] });
     }
-    const userRows = await sql`SELECT id FROM users WHERE email = ${session.user.email}`;
+    const userRows = await sql`SELECT id FROM users WHERE email = ${effective.email}`;
     const userRow = Array.isArray(userRows) ? userRows[0] : userRows;
     const userId = (userRow as { id: string } | undefined)?.id;
     if (!userId) {

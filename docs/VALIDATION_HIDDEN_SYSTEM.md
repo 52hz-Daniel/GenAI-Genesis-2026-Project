@@ -11,6 +11,8 @@ This document describes a **repeatable way to verify** that Loop B writes insigh
 - `POSTGRES_URL` (or your Postgres connection env) set in the app environment.
 - One test user signed in (e.g. Google). Note their `user_id` (UUID) from the `users` table for SQL checks.
 
+**Demo / Judge mode:** To let unauthenticated judges use "Experience as judge", set `DEMO_JUDGE_EMAIL` in env (e.g. `demo-judge@aptitude.demo`) and seed that user: `npx tsx scripts/seed-demo-judge-user.ts` (requires POSTGRES_URL; optionally OPENAI_API_KEY for embedding). The script creates the user and inserts one session plus weakness/strength insights so Progress and dynamic context show content.
+
 ---
 
 ## Simulated Progression Test (Three Sessions)

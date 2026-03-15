@@ -4,14 +4,22 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import type { OpportunityFeedItem } from "@/lib/aggregation/types";
+import { isDemoJudgeMode } from "@/lib/demo-judge-client";
 
 export function OpportunitiesStrip() {
   const { data: session, status } = useSession();
+  const [demoJudgeActive, setDemoJudgeActive] = useState(false);
   const [opportunities, setOpportunities] = useState<OpportunityFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user) {
+    setDemoJudgeActive(isDemoJudgeMode());
+  }, []);
+
+  const canFetch = (status === "authenticated" && session?.user) || demoJudgeActive;
+
+  useEffect(() => {
+    if (!canFetch) {
       setLoading(false);
       return;
     }
@@ -22,11 +30,11 @@ export function OpportunitiesStrip() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [status, session?.user]);
+  }, [canFetch, status, session?.user, demoJudgeActive]);
 
   if (status === "loading" || loading) return null;
 
-  if (!session?.user) {
+  if (!session?.user && !demoJudgeActive) {
     return (
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <h2 className="font-display text-lg font-semibold text-foreground mb-2">Community</h2>

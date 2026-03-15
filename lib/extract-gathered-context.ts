@@ -24,6 +24,7 @@ export async function extractGatheredContext(
   transcript: string,
   _sessionFocus?: string
 ): Promise<GatheredContextJson> {
+  void _sessionFocus; // reserved for future prompt use
   const openai = getOpenAIClient();
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",

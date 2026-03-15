@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OpportunitiesStrip } from "@/components/opportunities/OpportunitiesStrip";
+import { JudgeDemoButtons } from "@/components/demo/JudgeDemoButtons";
 
 export default function Home() {
   return (
@@ -12,6 +13,11 @@ export default function Home() {
         <p className="text-lg text-muted max-w-2xl mx-auto">
           Your first win is under 60 seconds away.
         </p>
+        <section className="mt-6 rounded-xl border border-border bg-card/50 px-5 py-4 max-w-md mx-auto" aria-label="For judges">
+          <p className="text-sm font-medium text-foreground mb-3">For judges</p>
+          <p className="text-xs text-muted mb-3">Try the full product without signing in, or take a 3‑minute guided tour.</p>
+          <JudgeDemoButtons />
+        </section>
       </section>
 
       {/* Live Interview — first module */}

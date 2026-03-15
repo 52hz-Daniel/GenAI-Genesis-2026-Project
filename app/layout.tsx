@@ -6,7 +6,10 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ConsentBanner } from "@/components/analytics/ConsentBanner";
 import { AnalyticsGate } from "@/components/analytics/AnalyticsGate";
 import { Header } from "@/components/Header";
+import { DemoModeBanner } from "@/components/demo/DemoModeBanner";
+import { DemoTourOverlay } from "@/components/demo/DemoTourOverlay";
 import { SessionProvider } from "@/components/auth/SessionProvider";
+import { Suspense } from "react";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -53,7 +56,11 @@ export default function RootLayout({
           <SessionProvider>
             <AnalyticsGate>
               <Header />
+              <DemoModeBanner />
               <main className="flex-1">{children}</main>
+              <Suspense fallback={null}>
+                <DemoTourOverlay />
+              </Suspense>
               <ConsentBanner />
             </AnalyticsGate>
           </SessionProvider>

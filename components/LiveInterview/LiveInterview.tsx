@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { getProfile, getProfileSummary } from "@/lib/profile";
 import { getMemoryForPrompt } from "@/lib/memory";
+import { isDemoJudgeMode } from "@/lib/demo-judge-client";
 import { LiveInterviewTimer } from "./LiveInterviewTimer";
 
 const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
@@ -15,7 +16,11 @@ type LiveInterviewProps = { demoMode?: boolean };
 
 export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
   const { data: session, status: authStatus } = useSession();
+  const [demoJudgeActive, setDemoJudgeActive] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  useEffect(() => {
+    setDemoJudgeActive(isDemoJudgeMode());
+  }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -36,7 +41,8 @@ export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
   }, []);
 
   const startSession = useCallback(async () => {
-    if (authStatus !== "authenticated" || !session?.user?.email) {
+    const canStart = (authStatus === "authenticated" && session?.user?.email) || isDemoJudgeMode();
+    if (!canStart) {
       setErrorMessage("Please sign in to start a live interview.");
       return;
     }
@@ -52,6 +58,7 @@ export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
 
       const res = await fetch("/api/live", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profileSummary: profileSummary || undefined,
@@ -192,7 +199,7 @@ export function LiveInterview({ demoMode }: LiveInterviewProps = {}) {
     );
   }
 
-  if (authStatus !== "authenticated") {
+  if (authStatus !== "authenticated" && !demoJudgeActive) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 text-center">
         <p className="text-foreground mb-4">

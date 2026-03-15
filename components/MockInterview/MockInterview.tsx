@@ -5,17 +5,23 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { logEvent } from "@/lib/analytics";
 import { setInterviewBadgeUnlocked } from "@/lib/badges";
-import { INTERVIEW_ANSWER_EXAMPLES } from "@/lib/demo-examples";
 import { getProfile, getProfileSummary, hasMinimalProfile, setProfile, setOnboardingComplete, isOnboardingComplete, type Profile } from "@/lib/profile";
 import { addSessionNote, getMemoryForPrompt } from "@/lib/memory";
 import { parseStructuredFeedback, stripStructuredDelimiters } from "@/lib/parse-feedback-blocks";
+import { isDemoJudgeMode } from "@/lib/demo-judge-client";
 
 const TOTAL_QUESTIONS = 3;
+const INITIAL_USER_MESSAGE =
+  "Hi, I'm ready to practice. Please start with a short intro and your first behavioral question.";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-export function MockInterview() {
+type MockInterviewProps = { tourMode?: boolean };
+
+export function MockInterview({ tourMode }: MockInterviewProps = {}) {
   const { data: session } = useSession();
+  const [tourDemoRunning, setTourDemoRunning] = useState(false);
+  const [exampleAnswerLoading, setExampleAnswerLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,13 +50,16 @@ export function MockInterview() {
 
   useEffect(() => {
     const profile = getProfile();
-    if (!hasMinimalProfile(profile) && !isOnboardingComplete()) {
+    const needsFieldOfInterest = !profile.fieldOfInterest?.trim();
+    const needsFullProfile = !hasMinimalProfile(profile) && !isOnboardingComplete();
+    if (needsFieldOfInterest || needsFullProfile) {
       setShowQuestionnaire(true);
       setQuestionnaireForm({
         targetRole: profile.targetRole ?? "",
         year: profile.year ?? "",
         major: profile.major ?? "",
         improveArea: profile.improveArea ?? "",
+        fieldOfInterest: profile.fieldOfInterest ?? "",
         firstGen: profile.firstGen,
       });
     }
@@ -115,8 +124,9 @@ export function MockInterview() {
     const step = history.filter((m) => m.role === "user").length;
     logEvent("interview_step", { step });
     try {
+      const hasEffectiveUser = session?.user || isDemoJudgeMode();
       let dynamicContext = "";
-      if (session?.user) {
+      if (hasEffectiveUser) {
         try {
           const dcRes = await fetch("/api/context/dynamic");
           const dcData = await dcRes.json();
@@ -150,7 +160,7 @@ export function MockInterview() {
       const reply = data.reply ?? "";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
 
-      if (phase === "post_warmup" && session?.user) {
+      if (phase === "post_warmup" && hasEffectiveUser) {
         try {
           const sessionFocusMatch = dynamicContext.match(/This session focus:\s*([^.]+)/);
           const sessionFocus = sessionFocusMatch
@@ -174,7 +184,7 @@ export function MockInterview() {
         setCompleted(true);
         logEvent("interview_completed");
         const fullHistory = [...history, { role: "assistant" as const, content: reply }];
-        if (session?.user) {
+        if (hasEffectiveUser) {
           try {
             await fetch("/api/session/complete", {
               method: "POST",
@@ -186,13 +196,15 @@ export function MockInterview() {
           }
         }
         try {
+          const profileSummary = getProfileSummary(getProfile());
           const res = await fetch("/api/session-notes", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: fullHistory }),
+            body: JSON.stringify({ messages: fullHistory, profileSummary: profileSummary || undefined }),
           });
           const data = await res.json();
-          if (res.ok && data.markdown) addSessionNote(data.markdown);
+          if (res.ok && data.markdown)
+            addSessionNote(data.markdown, data.userFeedback ?? data.markdown);
         } catch {
           // ignore
         }
@@ -214,6 +226,81 @@ export function MockInterview() {
     e.preventDefault();
     sendMessage(input);
   };
+
+  const runTourDemo = useCallback(async () => {
+    if (tourDemoRunning) return;
+    setTourDemoRunning(true);
+    setMessages([]);
+    setCompleted(false);
+    let dynamicContext = "";
+    try {
+      const dcRes = await fetch("/api/context/dynamic");
+      const dcData = await dcRes.json();
+      if (dcData?.context) dynamicContext = dcData.context;
+    } catch {
+      // ignore
+    }
+    const profileSummary = getProfileSummary(getProfile());
+    const memoryContext = getMemoryForPrompt();
+    const context = [dynamicContext, memoryContext, profileSummary].filter(Boolean).join("\n\n") || undefined;
+
+    let history: Message[] = [{ role: "user", content: INITIAL_USER_MESSAGE }];
+    setMessages([...history]);
+
+    try {
+      const res1 = await fetch("/api/openai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "interview", history, context, phase: "warmup" }),
+      });
+      const data1 = await res1.json();
+      if (!res1.ok) throw new Error(data1.error || "Request failed");
+      const reply1 = data1.reply ?? "";
+      history = [...history, { role: "assistant", content: reply1 }];
+      setMessages([...history]);
+
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const lastAssistant = history[history.length - 1].content;
+        const impRes = await fetch("/api/demo/imperfect-answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: lastAssistant }),
+        });
+        const impData = await impRes.json();
+        const answer = (impData.answer ?? "").trim() || "It went well and we got it done.";
+        history = [...history, { role: "user", content: answer }];
+        setMessages([...history]);
+        await new Promise((r) => setTimeout(r, 300));
+
+        const resNext = await fetch("/api/openai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "interview", history, context }),
+        });
+        const dataNext = await resNext.json();
+        if (!resNext.ok) throw new Error(dataNext.error || "Request failed");
+        const replyNext = dataNext.reply ?? "";
+        history = [...history, { role: "assistant", content: replyNext }];
+        setMessages([...history]);
+      }
+
+      const lastContent = history[history.length - 1].content;
+      if (lastContent.includes("BADGE_UNLOCKED")) {
+        setInterviewBadgeUnlocked();
+      }
+      setCompleted(true);
+      window.dispatchEvent(new CustomEvent("demo-tour-interview-done"));
+    } catch (e) {
+      console.error("Tour demo error", e);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Something went wrong. You can try again or use the practice flow normally." },
+      ]);
+      window.dispatchEvent(new CustomEvent("demo-tour-interview-done"));
+    } finally {
+      setTourDemoRunning(false);
+    }
+  }, [tourDemoRunning]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -279,10 +366,45 @@ export function MockInterview() {
   const lastMessageFromAssistant = messages.length > 0 && messages[messages.length - 1].role === "assistant";
   const currentExampleIndex = userQuestionCount - 1;
   const showDemoExample = !completed && !loading && lastMessageFromAssistant && currentExampleIndex >= 0 && currentExampleIndex < TOTAL_QUESTIONS;
-  const currentExampleText = showDemoExample ? INTERVIEW_ANSWER_EXAMPLES[currentExampleIndex] : "";
+  const lastAssistantContent = showDemoExample && messages.length > 0 ? messages[messages.length - 1].content : "";
+
+  const handleUseExampleAnswer = useCallback(async () => {
+    if (!lastAssistantContent || exampleAnswerLoading) return;
+    setExampleAnswerLoading(true);
+    try {
+      const res = await fetch("/api/demo/imperfect-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: lastAssistantContent }),
+      });
+      const data = await res.json();
+      const answer = (data.answer ?? "").trim() || "It went well and we got it done.";
+      setInput(answer);
+    } catch {
+      setInput("It went well and we got it done.");
+    } finally {
+      setExampleAnswerLoading(false);
+    }
+  }, [lastAssistantContent, exampleAnswerLoading]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] max-h-[700px]">
+      {tourMode && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 mb-3">
+          <p className="text-sm text-foreground mb-2">3‑min demo: run an automated 3‑question flow with deliberately imperfect answers so you see how the coach pushes back.</p>
+          {!tourDemoRunning && messages.length === 0 ? (
+            <button
+              type="button"
+              onClick={runTourDemo}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+            >
+              Run 3‑Q demo
+            </button>
+          ) : tourDemoRunning ? (
+            <p className="text-sm text-muted">Running 3‑Q demo…</p>
+          ) : null}
+        </div>
+      )}
       <div className="flex items-center justify-between px-1 pb-2 gap-3">
         <span className="text-sm text-muted">
           Question {progress} of {TOTAL_QUESTIONS}
@@ -392,10 +514,11 @@ export function MockInterview() {
                 <span className="text-xs text-muted">Quick demo for judges:</span>
                 <button
                   type="button"
-                  onClick={() => setInput(currentExampleText)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted-bg transition-colors"
+                  onClick={handleUseExampleAnswer}
+                  disabled={exampleAnswerLoading}
+                  className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted-bg transition-colors disabled:opacity-50"
                 >
-                  Use example answer for this question
+                  {exampleAnswerLoading ? "Generating example…" : "Use AI example answer for this question"}
                 </button>
               </div>
             )}
@@ -481,6 +604,17 @@ export function MockInterview() {
               </div>
             </div>
             <div>
+              <label className="block text-xs text-muted mb-1">What field are you interested in?</label>
+              <input
+                type="text"
+                value={questionnaireForm.fieldOfInterest ?? ""}
+                onChange={(e) => setQuestionnaireForm((p) => ({ ...p, fieldOfInterest: e.target.value }))}
+                placeholder="e.g. Business analysis, Consulting, Product"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <p className="text-xs text-muted mt-0.5">We’ll use this so the coach doesn’t assume a different field (e.g. consulting if you said business analysis).</p>
+            </div>
+            <div>
               <label className="block text-xs text-muted mb-1">What do you want to improve in interviews?</label>
               <input
                 type="text"
@@ -511,6 +645,7 @@ export function MockInterview() {
                   year: questionnaireForm.year?.trim() || undefined,
                   major: questionnaireForm.major?.trim() || undefined,
                   improveArea: questionnaireForm.improveArea?.trim() || undefined,
+                  fieldOfInterest: questionnaireForm.fieldOfInterest?.trim() || undefined,
                   firstGen: questionnaireForm.firstGen,
                 });
                 setOnboardingComplete();

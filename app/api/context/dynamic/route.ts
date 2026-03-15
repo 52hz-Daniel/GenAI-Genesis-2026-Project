@@ -1,15 +1,14 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { getDynamicContextForUser, formatDynamicContext, getSessionFocusLabel } from "@/lib/dynamic-prompt";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(request);
+    if (!effective?.email) {
       return NextResponse.json({ context: "", sessionFocusLabel: "" });
     }
-    const ctx = await getDynamicContextForUser(session.user.email);
+    const ctx = await getDynamicContextForUser(effective.email);
     if (!ctx) {
       return NextResponse.json({ context: "", sessionFocusLabel: "" });
     }

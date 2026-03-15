@@ -3,12 +3,11 @@
  * POST: create a Realtime session (ephemeral client secret) for the client to connect via WebRTC/WebSocket.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { getDynamicContextForUser, formatDynamicContext } from "@/lib/dynamic-prompt";
 import { getLiveRapportContext } from "@/lib/live-context";
 import { getLiveInterviewerInstructionsForRealtime } from "@/lib/live-prompts";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 const REALTIME_VOICE = "alloy";
 
@@ -21,8 +20,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(request);
+    // #region agent log
+    fetch('http://127.0.0.1:7683/ingest/9250a4a4-eabe-480a-9c5d-97ebeeafe803',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6526e8'},body:JSON.stringify({sessionId:'6526e8',location:'app/api/live/route.ts:POST',message:'Live POST after getEffectiveUser',data:{hasEffective:!!effective,hasEmail:!!effective?.email,will401:!effective?.email},timestamp:Date.now(),hypothesisId:'H1-H5'})}).catch(()=>{});
+    // #endregion
+    if (!effective?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,10 +36,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = await getOrCreateUserByEmail(session.user.email);
+    const userId = await getOrCreateUserByEmail(effective.email);
 
     const [ctx, rapportContext] = await Promise.all([
-      getDynamicContextForUser(session.user.email),
+      getDynamicContextForUser(effective.email),
       userId ? getLiveRapportContext(userId) : Promise.resolve(""),
     ]);
     const dynamicContext = ctx ? formatDynamicContext(ctx) : "";

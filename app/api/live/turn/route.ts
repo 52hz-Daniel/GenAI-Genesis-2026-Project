@@ -4,20 +4,19 @@
  * Returns: { reply, audioBase64?, history }.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getOrCreateUserByEmail } from "@/lib/db-users";
 import { getDynamicContextForUser, formatDynamicContext } from "@/lib/dynamic-prompt";
 import { getLiveRapportContext } from "@/lib/live-context";
 import { getLiveInterviewReply } from "@/lib/live-agent";
 import { getOpenAIClient } from "@/lib/openai";
+import { getEffectiveUser } from "@/lib/demo-judge";
 
 const LIVE_VOICE = "alloy";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const effective = await getEffectiveUser(request);
+    if (!effective?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -41,9 +40,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing transcript or audio" }, { status: 400 });
     }
 
-    const userId = await getOrCreateUserByEmail(session.user.email);
+    const userId = await getOrCreateUserByEmail(effective.email);
     const [ctx, rapportContext] = await Promise.all([
-      getDynamicContextForUser(session.user.email),
+      getDynamicContextForUser(effective.email),
       userId ? getLiveRapportContext(userId) : Promise.resolve(""),
     ]);
     const dynamicContext = ctx ? formatDynamicContext(ctx) : "";
