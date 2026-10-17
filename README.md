@@ -2,6 +2,7 @@
 
 **Aptitude AI** is an accessible, AI-powered career companion for university students. It addresses a critical gap: students graduate without the soft skills employers demand, while campus career centers are overwhelmed. The app meets students where they are with a friendly, judgment-free product that **remembers you**—so every session and every feature gets better over time.
 
+
 - **Practice behavioral interviews** (text or optional voice) with an empathetic AI coach that can reference your past performance and re-test on weaknesses.
 - **Translate** academic experiences into ATS-friendly, NACE-aligned resume bullets in seconds.
 - **Live voice interview** powered by OpenAI Realtime for real-time conversation with the same coaching brain.
